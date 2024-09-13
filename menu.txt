@@ -1,0 +1,52 @@
+Coffee-Based Drinks:
+o) Latte - Espresso with steamed milk and a light layer of foam on top.
+o) Cappuccino - Equal parts espresso, steamed milk, and a thick layer of foam.
+o) Espresso - A small, concentrated shot of coffee with a bold flavor.
+o) Drip Coffee - Traditional brewed coffee made by dripping hot water through ground coffee.
+o) Iced Coffee - Regular brewed coffee served over ice, often with milk or sweetener.
+o) Americano - Espresso diluted with hot water.
+o) Flat White - A smoother and creamier version of a latte with a higher ratio of coffee to milk.
+o) Macchiato - Espresso topped with a small amount of foamed milk.
+o) Mocha - A chocolate-flavored variant of a latte.
+o) Cortado - Equal parts espresso and steamed milk.
+o) Affogato - Espresso poured over a scoop of vanilla ice cream.
+o) Cafe au Lait - Drip coffee mixed with steamed milk.
+o) Ristretto - A short shot of espresso, stronger and more concentrated.
+o) Nitro Cold Brew - Cold brew coffee infused with nitrogen for a creamy texture.
+
+Non-Coffee Beverages:
+o) Chai Latte - Spiced tea concentrate mixed with steamed milk.
+o) Matcha Latte - A green tea powder whisked into hot water or milk.
+o) Hot Chocolate - A classic chocolate drink, often topped with whipped cream.
+o) Golden Milk - A turmeric-based drink mixed with milk, often with spices like cinnamon and ginger.
+o) Herbal Teas - Various blends of caffeine-free teas made from herbs, spices, and fruits.
+o) Lemonade - A refreshing blend of lemon juice, water, and sugar, often served cold.
+
+Specialty and Seasonal Drinks:
+o) Pumpkin Spice Latte - A seasonal favorite, often available in the fall.
+o) Peppermint Mocha - A wintertime drink combining chocolate, espresso, and peppermint.
+o) Caramel Macchiato - Espresso, milk, and vanilla syrup topped with caramel drizzle.
+o) Iced Matcha Latte - Matcha green tea served cold with milk.
+o) Frappuccino - A blended ice coffee drink, available in various flavors.
+
+Customizations:
+o) Extra Shot - Add an additional shot of espresso for a stronger coffee.
+o) Flavored Syrups - Choose from various flavors like vanilla, caramel, hazelnut, or seasonal options.
+o) Milk Alternatives - Options like almond, oat, soy, coconut, or lactose-free milk.
+o) Decaf - Decaffeinated versions of coffee drinks.
+o) Whipped Cream - Add a topping of whipped cream to your drink.
+o) Sweeteners - Options like sugar, honey, stevia, or agave syrup.
+o) Foam Preference - Choose light, regular, or no foam for drinks like lattes and cappuccinos.
+o) Ice Levels - Adjust the amount of ice (light, regular, extra) in cold drinks.
+o) Temperature Adjustments - Options for extra hot, warm, or iced versions.
+o) Toppings - Add-ons like cinnamon, cocoa powder, or chocolate drizzle.
+o) Cup Size - Small, medium, large, or extra large options.
+o) Strength - Choose the strength of the coffee (regular, strong, extra strong).
+o) Sweetness Level - Customize the sweetness (unsweetened, light, regular, extra sweet).
+o) Blended Option - Blend your drink for a smoother, frozen texture (e.g., frappés).
+o) Espresso Strength - Adjust the concentration of the espresso shot (ristretto, regular, lungo).
+o) Alternative Sweeteners - Like sugar-free syrups or zero-calorie sweeteners.
+o) Soy Free - Soy-free versions of milk alternatives.
+o) Organic Options - Choose organic coffee beans or organic milk.
+o) Cold Foam - Add a layer of cold, frothy milk foam on iced drinks
+o) Custom Spice Blend - Add a mix of spices like nutmeg, cloves, or cardamom.

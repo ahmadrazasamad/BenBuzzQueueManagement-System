@@ -1,19 +1,28 @@
 #include <iostream>
 #include <string>
-#include <chrono>
-#include <ctime>
-#include <iomanip>
+#include <ctime>     // for time
+#include <chrono>    // for doing addition and subtraction with time
+#include <iomanip>   // for converting time from chrono to time_t
+#include <algorithm> // for find
+#include <vector>    // for drink type and customization
+#include <fstream>   // for file handling
+#include <limits>    // for numeric limits
 using namespace std;
 
 struct Order
 {
-    string customerName, drinkType, customization;
     int orderNumber;
+    string customerName, drinkType;
+    vector<string> customization;                // since customizations can be multiple
     time_t orderPlacementTime, orderServingTime; // time is in minutes
     Order *next;
 };
-Order *head = nullptr;
+Order *head = nullptr; // singly linked-list
 
+vector<string> drinkTypes;     // will initialize it from file
+vector<string> customizations; // will also initialize it from file
+
+// helper function start here
 string trim(const string &str)
 {
     size_t first = str.find_first_not_of(" \t\n\r");
@@ -23,268 +32,334 @@ string trim(const string &str)
     return str.substr(first, last - first + 1);
 }
 
-int orderCount = 0; // initially no-orders, for having unique orderNumbers, like a ticket
-void placeOrder()
+int takeIntegerInput(int rangeStart, int rangeEnd)
 {
-    string name = "", type = "", customization = "";
-    cout << "Enter your name: ";
+    int choice = 0;
+    while (true)
+    {
+        cin >> choice;
+
+        if (cin.fail() || choice < rangeStart || choice > rangeEnd)
+        {
+            cout << "Invalid input! Kindly re-enter a number that indicates your choice between " << rangeStart << "(inclusive) and " << rangeEnd << "(inclusive): ";
+            cin.clear();                                         // Clear the error flag set by invalid input
+            cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Ignore invalid input
+        }
+        else
+        {
+            cin.ignore(); // input buffer
+            break;
+        }
+    }
+    return choice;
+}
+
+string takeStringInput(string comment)
+{
+    string str = "";
+    getline(cin, str);
+    str = trim(str);
+    while (str.empty())
+    {
+        cout << comment << " cannot be empty or contain only spaces...\nKindly re-enter: ";
+        getline(cin, str);
+        str = trim(str);
+    }
+    return str;
+}
+
+string selectDrink()
+{
+    ifstream inFile("menu.txt");
+    string line = "";
+    int drinkCount = 0;
+    while (getline(inFile, line)) // read line by line
+    {
+        if (line == "Customizations:") // stop if "Customizations:" is found
+            break;
+
+        if (!line.empty())
+        {
+            if (line != "Coffee-Based Drinks:" || line != "Non-Coffee Beverages:" || line != "Specialty and Seasonal Drinks:")
+            {
+                drinkCount++;
+                cout << drinkCount << line.substr(1) << endl;
+            }
+            else
+                cout << line << endl;
+        }
+    }
+    inFile.close();
+
+    int choice = 0;
+    cout << "Which drink would you like to order, enter your choice (1-" << drinkTypes.size() << "): ";
+    choice = takeIntegerInput(1, drinkTypes.size());
+    return drinkTypes[choice - 1];
+}
+
+vector<string> selectCustomizations(string drinkName)
+{
+    char option = '\0';
+    cout << "Do you want any customization(s) in your drink '" << drinkName << "':\no) Yes\no) None - Just enjoy your drink.\nEnter your choice('Y' for yes and 'anyother-key' for no): ";
+    cin >> option;
+    option = tolower(option);
+    cin.ignore(); // input buffer
+
+    vector<string> choosenCustomizations;
+    if (option == 'y')
+    {
+        ifstream inFile("menu.txt");
+        string line = "";
+        while (getline(inFile, line))
+        {
+            if (line == "Customizations:")
+                break;
+        }
+        cout << line << endl;
+
+        int customizationCount = 0;
+        while (getline(inFile, line))
+        {
+            customizationCount++;
+            cout << customizationCount << line.substr(1) << endl;
+        }
+        inFile.close();
+
+        int choice = 0;
+        char option = '\0';
+        while (true)
+        {
+            choice = 0; // reset on every loop run
+            cout << "Which customization would you like, enter your choice (1-" << customizations.size() << "): ";
+            choice = takeIntegerInput(1, customizations.size());
+            choosenCustomizations.push_back(customizations[choice - 1]);
+
+            option = '\0'; // reset on every loop run
+            cout << "Do you want to add another customization, press 'Y' for yes and 'anyother-key' for no: ";
+            cin >> option;
+            cin.ignore(); // input buffer
+            option = tolower(option);
+
+            if (option != 'y')
+                break;
+        }
+    }
+    else
+        choosenCustomizations.push_back("None");
+    return choosenCustomizations;
+}
+
+void showOrderSummary(bool isUpdated, const string &drinkName, const vector<string> &choosenCustomizations)
+{
+    cout << "\n--- " << (isUpdated ? "Updated " : "") << "Order Summary ---\n";
+    cout << "Drink: " << drinkName << endl;
+    cout << "Customization" << (choosenCustomizations.size() > 1 ? "s:\n" : (": " + choosenCustomizations[0]));
+    for (string customization : choosenCustomizations)
+        cout << "   o) " << customization << endl;
+    cout << "---------------------\n";
+}
+
+string drinkAndCustomizationNameValidation(bool isDrinkName)
+{
+    string name = "";
+    cout << "Enter name of the " << (isDrinkName ? "drink" : "customization") << " you want to add in the menu(name should not contain '-'): ";
     getline(cin, name);
     name = trim(name);
-
-    while (name.empty())
+    while (name.empty() || (name.find('-') != string::npos))
     {
-        cout << "Customer's name cannot be empty or contain only spaces...\nKindly re-enter: ";
+        if ((name.find('-') != string::npos))
+        {
+            cout << (isDrinkName ? "Drink" : "Customization") << "'s Name name should not contain '-'!\n";
+
+            // giving suggestion
+            string partition1 = name.substr(0, name.find('-'));
+            if (!partition1.empty()) // means '-' is at index 0
+            {
+                string partition2 = name.substr(name.find('-') + 1, name.length());
+                if (partition2.find('-') == string::npos)
+                { // means in partition 2 there is no other '-'
+                    char choice = '\0';
+                    cout << "Do you mean the " << (isDrinkName ? "drink" : "customization") << " name should be \"" << partition1 << " " << partition2 << "\", Press 'Y' for yes and 'anyother key' for no: ";
+                    cin >> choice;
+                    cin.ignore(); // input buffer
+                    choice = tolower(choice);
+                    if (choice == 'y')
+                    {
+                        name = partition1 + " " + partition2;
+                        return name;
+                    }
+                    else
+                        cout << "Kindly re-enter: ";
+                }
+                else
+                    cout << "Kindly re-enter: ";
+            }
+            else
+                cout << "Kindly re-enter: ";
+        }
+        else
+            cout << (isDrinkName ? "Drink" : "Customization") << "'s Name name cannot be empty or contain only spaces...\nKindly re-enter: ";
         getline(cin, name);
         name = trim(name);
     }
 
-    cout << "\t\t\tMenu:\n"; // Menu printing starts here
+    return name;
+}
 
-    cout << "Coffee-Based Drinks:\n";
-    cout << "1. Latte - Espresso with steamed milk and a light layer of foam on top.\n";
-    cout << "2. Cappuccino - Equal parts espresso, steamed milk, and a thick layer of foam.\n";
-    cout << "3. Espresso - A small, concentrated shot of coffee with a bold flavor.\n";
-    cout << "4. Drip Coffee - Traditional brewed coffee made by dripping hot water through ground coffee.\n";
-    cout << "5. Iced Coffee - Regular brewed coffee served over ice, often with milk or sweetener.\n";
-    cout << "6. Americano - Espresso diluted with hot water.\n";
-    cout << "7. Flat White - A smoother and creamier version of a latte with a higher ratio of coffee to milk.\n";
-    cout << "8. Macchiato - Espresso topped with a small amount of foamed milk.\n";
-    cout << "9. Mocha - A chocolate-flavored variant of a latte.\n";
-    cout << "10. Cortado - Equal parts espresso and steamed milk.\n";
-    cout << "11. Affogato - Espresso poured over a scoop of vanilla ice cream.\n";
-    cout << "12. Café au Lait - Drip coffee mixed with steamed milk.\n";
-    cout << "13. Ristretto - A short shot of espresso, stronger and more concentrated.\n";
-    cout << "14. Nitro Cold Brew - Cold brew coffee infused with nitrogen for a creamy texture.\n\n";
+string convertStringToLowerCase(string str)
+{
+    for (int i = 0; i < str.length(); i++)
+        str[i] = tolower(str[i]);
+    return str;
+}
 
-    cout << "Non-Coffee Beverages:\n";
-    cout << "15. Chai Latte - Spiced tea concentrate mixed with steamed milk.\n";
-    cout << "16. Matcha Latte - A green tea powder whisked into hot water or milk.\n";
-    cout << "17. Hot Chocolate - A classic chocolate drink, often topped with whipped cream.\n";
-    cout << "18. Golden Milk - A turmeric-based drink mixed with milk, often with spices like cinnamon and ginger.\n";
-    cout << "19. Herbal Teas - Various blends of caffeine-free teas made from herbs, spices, and fruits.\n";
-    cout << "20. Lemonade - A refreshing blend of lemon juice, water, and sugar, often served cold.\n\n";
+void writeNewDrinkInFile(string lineAtWhichToBreak, string drinkName, string drinkDescription)
+{
+    ifstream inFile("menu.txt");
+    string line = "";
+    string data = "";
 
-    cout << "Specialty and Seasonal Drinks:\n";
-    cout << "21. Pumpkin Spice Latte - A seasonal favorite, often available in the fall.\n";
-    cout << "22. Peppermint Mocha - A wintertime drink combining chocolate, espresso, and peppermint.\n";
-    cout << "23. Caramel Macchiato - Espresso, milk, and vanilla syrup topped with caramel drizzle.\n";
-    cout << "24. Iced Matcha Latte - Matcha green tea served cold with milk.\n";
-    cout << "25. Frappuccino - A blended ice coffee drink, available in various flavors.\n\n";
-
-    int choice = 0;
-    cout << "Which drink would you like to order, enter your choice (1-25): ";
-    cin >> choice;
-    cin.ignore(); // input buffer
-
-    while (choice < 1 || choice > 25) // ask until a valid drink's choice is made.
+    while (getline(inFile, line))
     {
-        cout << "Invalid choice.\nKindly re-enter the number of the drink of your choice from the menu: ";
-        cin >> choice;
-        cin.ignore(); // clear the input buffer
+        if (line == lineAtWhichToBreak)
+            break;
+        if (!line.empty())
+            data += line + "\n";
+    }
+    data += "o) " + drinkName + " - " + drinkDescription + "\n\n";
+    data += lineAtWhichToBreak + "\n";
+    while (getline(inFile, line))
+    {
+        data += line;
+        if (inFile.peek() != EOF) // Check if the next character is not EOF
+            data += "\n";
+    }
+    inFile.close();
+
+    ofstream outFile("menu.txt");
+    outFile << data;
+    outFile.close();
+}
+
+void initializeMenu()
+{
+    ifstream inFile("menu.txt");
+    string line = "";
+
+    while (getline(inFile, line)) // extracting drinks
+    {
+        if (line == "Customizations:") // stop if "Customizations:" is found
+            break;
+        if (line == "Coffee-Based Drinks:" || line == "Non-Coffee Beverages:" || line == "Specialty and Seasonal Drinks:")
+            getline(inFile, line);
+        if (!line.empty())
+        {
+            string extractedDrink = "";
+            int i = 3; // as line[0] is 'o' line[1] is ')' and line[2] is ' '
+            while (i < line.size() && line[i + 1] != '-')
+            {
+                extractedDrink += line[i];
+                i++;
+            }
+            drinkTypes.push_back(extractedDrink);
+        }
     }
 
-    switch (choice)
+    while (getline(inFile, line)) // extracting cutomizations
     {
-    case 1:
-        type = "Latte";
-        break;
-    case 2:
-        type = "Cappuccino";
-        break;
-    case 3:
-        type = "Espresso";
-        break;
-    case 4:
-        type = "Drip Coffee";
-        break;
-    case 5:
-        type = "Iced Coffee";
-        break;
-    case 6:
-        type = "Americano";
-        break;
-    case 7:
-        type = "Flat White";
-        break;
-    case 8:
-        type = "Macchiato";
-        break;
-    case 9:
-        type = "Mocha";
-        break;
-    case 10:
-        type = "Cortado";
-        break;
-    case 11:
-        type = "Affogato";
-        break;
-    case 12:
-        type = "Café au Lait";
-        break;
-    case 13:
-        type = "Ristretto";
-        break;
-    case 14:
-        type = "Nitro Cold Brew";
-        break;
-    case 15:
-        type = "Chai Latte";
-        break;
-    case 16:
-        type = "Matcha Latte";
-        break;
-    case 17:
-        type = "Hot Chocolate";
-        break;
-    case 18:
-        type = "Golden Milk";
-        break;
-    case 19:
-        type = "Herbal Teas";
-        break;
-    case 20:
-        type = "Lemonade";
-        break;
-    case 21:
-        type = "Pumpkin Spice Latte";
-        break;
-    case 22:
-        type = "Peppermint Mocha";
-        break;
-    case 23:
-        type = "Caramel Macchiato";
-        break;
-    case 24:
-        type = "Iced Matcha Latte";
-        break;
-    case 25:
-        type = "Frappuccino";
-        break;
+        string extractedCustomization = "";
+        int i = 3; // as line[0] is 'o' line[1] is ')' and line[2] is ' '
+        while (i < line.size() && line[i + 1] != '-')
+        {
+            extractedCustomization += line[i];
+            i++;
+        }
+        customizations.push_back(extractedCustomization);
     }
+    inFile.close();
+}
+// helper function end here
 
-    choice = 0; // reset for customization selection
-    cout << "Customizations:\n";
-    cout << "1. Extra Shot - Add an additional shot of espresso for a stronger coffee.\n";
-    cout << "2. Flavored Syrups - Choose from various flavors like vanilla, caramel, hazelnut, or seasonal options.\n";
-    cout << "3. Milk Alternatives - Options like almond, oat, soy, coconut, or lactose-free milk.\n";
-    cout << "4. Decaf - Decaffeinated versions of coffee drinks.\n";
-    cout << "5. Whipped Cream - Add a topping of whipped cream to your drink.\n";
-    cout << "6. Sweeteners - Options like sugar, honey, stevia, or agave syrup.\n";
-    cout << "7. Foam Preference - Choose light, regular, or no foam for drinks like lattes and cappuccinos.\n";
-    cout << "8. Ice Levels - Adjust the amount of ice (light, regular, extra) in cold drinks.\n";
-    cout << "9. Temperature Adjustments - Options for extra hot, warm, or iced versions.\n";
-    cout << "10. Toppings - Add-ons like cinnamon, cocoa powder, or chocolate drizzle.\n";
-    cout << "11. Cup Size - Small, medium, large, or extra large options.\n";
-    cout << "12. Strength - Choose the strength of the coffee (regular, strong, extra strong).\n";
-    cout << "13. Sweetness Level - Customize the sweetness (unsweetened, light, regular, extra sweet).\n";
-    cout << "14. Blended Option - Blend your drink for a smoother, frozen texture (e.g., frappés).\n";
-    cout << "15. Espresso Strength - Adjust the concentration of the espresso shot (ristretto, regular, lungo).\n";
-    cout << "16. Alternative Sweeteners - Like sugar-free syrups or zero-calorie sweeteners.\n";
-    cout << "17. Soy-Free - Soy-free versions of milk alternatives.\n";
-    cout << "18. Organic Options - Choose organic coffee beans or organic milk.\n";
-    cout << "19. Cold Foam - Add a layer of cold, frothy milk foam on iced drinks.\n";
-    cout << "20. Custom Spice Blend - Add a mix of spices like nutmeg, cloves, or cardamom.\n";
-    cout << "21. None - Just enjoy your drink.\n\n";
+int orderCount = 0; // initially no-orders, for having unique orderNumbers, like a ticket
+void placeOrder()
+{
+    string name = "";
+    cout << "Enter your name: ";
+    name = takeStringInput("Customer's name");
 
-    cout << "Which customization would you like, enter your choice (1-21): ";
-    cin >> choice;
-    cin.ignore(); // input buffer
+    cout << "\t\t\tMenu:\n";
+    string drinkName = selectDrink();
+    vector<string> choosenCustomizations = selectCustomizations(drinkName);
 
-    while (choice < 1 || choice > 21) // ask until a valid customization choice is made.
+    showOrderSummary(false, drinkName, choosenCustomizations);
+    char option = '\n';
+    cout << "Would you like to confirm your order? Press 'Y' for yes and 'anyother-key' for no: ";
+    cin >> option;
+    cin.ignore();
+    option = tolower(option);
+    if (option != 'y')
     {
-        cout << "Invalid choice.\nKindly re-enter the number of the cutomization of your choice from the menu: ";
-        cin >> choice;
-        cin.ignore(); // clear the input buffer
-    }
+        while (true)
+        {
+            int choice = 0;
+            cout << "What would you like to update(re-order):\n1) Drink or\n2) Customization" << (choosenCustomizations.size() > 1) ? "s" : "";
+            choice = takeIntegerInput(1, 2);
 
-    switch (choice)
-    {
-    case 1:
-        customization = "Extra Shot";
-        break;
-    case 2:
-        customization = "Flavored Syrups";
-        break;
-    case 3:
-        customization = "Milk Alternatives";
-        break;
-    case 4:
-        customization = "Decaf";
-        break;
-    case 5:
-        customization = "Whipped Cream";
-        break;
-    case 6:
-        customization = "Sweeteners";
-        break;
-    case 7:
-        customization = "Foam Preference";
-        break;
-    case 8:
-        customization = "Ice Levels";
-        break;
-    case 9:
-        customization = "Temperature Adjustments";
-        break;
-    case 10:
-        customization = "Toppings";
-        break;
-    case 11:
-        customization = "Cup Size";
-        break;
-    case 12:
-        customization = "Strength";
-        break;
-    case 13:
-        customization = "Sweetness Level";
-        break;
-    case 14:
-        customization = "Blended Option";
-        break;
-    case 15:
-        customization = "Espresso Strength";
-        break;
-    case 16:
-        customization = "Alternative Sweeteners";
-        break;
-    case 17:
-        customization = "Soy-Free";
-        break;
-    case 18:
-        customization = "Organic Options";
-        break;
-    case 19:
-        customization = "Cold Foam";
-        break;
-    case 20:
-        customization = "Custom Spice Blend";
-        break;
-    case 21:
-        customization = "None";
-        break;
-    }
+            if (choice == 1)
+                drinkName = selectDrink();
+            else // choice == 2
+                choosenCustomizations = selectCustomizations(drinkName);
+            showOrderSummary(true, drinkName, choosenCustomizations);
 
+            option = '\0'; // reset option variable
+            cout << "Do you want to update anything else further more, press 'Y' for yes and 'anyother-key' for no: ";
+            cin >> option;
+            cin.ignore();
+            option = tolower(option);
+            if (option != 'y')
+                break;
+        }
+    }
     auto now = chrono::system_clock::now();
     time_t orderPlacementTime = chrono::system_clock::to_time_t(now);
 
     Order *temp = new Order(); // new object
     temp->customerName = name;
-    temp->drinkType = type;
-    temp->customization = customization;
+    temp->drinkType = drinkName;
+    temp->customization = choosenCustomizations;
     temp->orderNumber = ++orderCount;
     temp->next = nullptr;
     temp->orderPlacementTime = orderPlacementTime;
+
+    cout << "o) " << temp->customerName << ", your order is placed.\n";
+    cout << "   Your order number is " << temp->orderNumber << ".\n";
+    cout << "   Your drink type is " << temp->drinkType << ".\n";
+    cout << "   Your drink customization" << ((temp->customization.size() > 1) ? "s are:\n" : " is: ");
+    if (temp->customization[0] == "None")
+        cout << "None\n";
+    else
+    {
+        if (temp->customization.size() > 1)
+        {
+            int i = 1;
+            for (string customizationVariable : temp->customization)
+            {
+                cout << "      " << i << ") " << customizationVariable << endl;
+                i++;
+            }
+        }
+        else
+            cout << temp->customization[0] << endl;
+    }
 
     if (head == nullptr)
     {
         auto estOrderServingTime = now + chrono::minutes(3); // as for a drink maximum three minutes
         time_t orderServingTime = chrono::system_clock::to_time_t(estOrderServingTime);
 
+        temp->orderServingTime = orderServingTime;
         head = temp;
-        head->orderServingTime = orderServingTime;
 
-        cout << "o) " << head->customerName << ", your order is placed.\n";
-        cout << "   Your order number is " << head->orderNumber << ".\n";
         cout << "   Your order will be ready in 3 minutes.\n\n";
         return;
     }
@@ -300,9 +375,6 @@ void placeOrder()
     time_t orderServingTime = chrono::system_clock::to_time_t(estOrderServingTime);
     current->next = temp;
 
-    cout << "o) " << temp->customerName << ", your order is placed.\n";
-    cout << "   Your order number is " << temp->orderNumber << ".\n";
-
     auto estWaitingTime = chrono::system_clock::from_time_t(temp->orderServingTime) - chrono::system_clock::from_time_t(temp->orderPlacementTime);
     auto minutes = chrono::duration_cast<chrono::minutes>(estWaitingTime).count();
     cout << "   Your order will be ready in " << minutes << " minutes.\n\n";
@@ -315,7 +387,7 @@ void serveOrder()
         cout << "No one is present in the queue to be served.\n";
         return;
     }
-    
+
     auto now = chrono::system_clock::now();
     time_t nowTime = chrono::system_clock::to_time_t(now);
 
@@ -324,6 +396,31 @@ void serveOrder()
         Order *nextPersonAfterHead = head->next;
         cout << head->drinkType << " served to " << head->customerName << ".\n";
         cout << head->customerName << ", we hope you enjoy your drink.\n";
+
+        // Writing in the file
+        ifstream inFile("servedOrdersDetails.txt");
+        string data = "";
+        string line = "";
+        while (getline(inFile, line))
+            data += line;
+        inFile.close();
+
+        ofstream outFile("servedOrdersDetails.txt", ios::out | ios::app);
+        if (!data.empty())
+            outFile << endl;
+        outFile << "o) Order Number: " << head->orderNumber << endl;
+        outFile << "   Customer Name: " << head->customerName << endl;
+        outFile << "   Drink Name: " << head->drinkType << endl;
+        outFile << "   Customization" << (head->customization.size() > 1 ? "s:\n" : (": " + head->customization[0]));
+        for (string customization : head->customization)
+            outFile << "    o) " << customization << endl;
+        outFile << "   Order Placement Time: " << ctime(&head->orderPlacementTime);
+        time_t orderDeliveryTime = time(nullptr);
+        string orderDeliveryTimeStr = ctime(&orderDeliveryTime);
+        orderDeliveryTimeStr.erase(orderDeliveryTimeStr.length() - 1);
+        outFile << "   Order Delivery Time: " << orderDeliveryTimeStr;
+        outFile.close();
+
         delete head;
         head = nextPersonAfterHead;
     }
@@ -350,13 +447,32 @@ void displayQueueStatus()
     while (current != nullptr)
     {
         numOfPersons++;
-        details += "o) Customer Name: " + current->customerName + "\n";
+        details += "o) Customer Order Number: " + to_string(current->orderNumber) + "\n";
+        details += "   Customer Name: " + current->customerName + "\n";
         details += "   Customer Drink Type: " + current->drinkType + "\n";
-        details += "   Customer Drink Customization: " + current->customization + "\n\n";
+        details += "   Customer Drink Customization" + string((current->customization.size() > 1) ? "s:\n" : ": ");
+
+        if (current->customization[0] == "None")
+            details += "None\n\n";
+        else
+        {
+            if (current->customization.size() > 1)
+            {
+                int i = 1;
+                for (string customizationVariable : current->customization)
+                {
+                    details += "      " + to_string(i) + ") " + customizationVariable + "\n";
+                    i++;
+                }
+                details += "\n";
+            }
+            else
+                details += current->customization[0] + "\n\n";
+        }
 
         current = current->next;
     }
-    cout << "There " << (numOfPersons == 1 ? "is only one person" : ("are " + to_string(numOfPersons) + " persons")) << "in the queue.\n\nDetails:\n";
+    cout << "There " << (numOfPersons == 1 ? "is only one person" : ("are " + to_string(numOfPersons) + " persons")) << "in the queue.\nDetails:\n";
     cout << details;
 }
 
@@ -369,58 +485,234 @@ void displayOrderDetails()
     }
     int orderNum = 0;
     cout << "Enter you order number: "; // since order number is unique, name can be same
-    cin >> orderNum;
-    cin.ignore();
+    while (true)
+    {
+        cin >> orderNum;
+        if (cin.fail())
+        {
+            cout << "Invalid input! Do not enter character or string, Kindly enter a valid order number: ";
+            cin.clear();                                         // Clear the error flag set by invalid input
+            cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Ignore invalid input
+        }
+        else if (orderNum < 1)
+        {
+            cout << "Invalid input! The order number shoul be greater than 0, Kindly enter a valid order number: ";
+            cin.ignore();
+        }
+        else
+        {
+            cin.ignore();
+            break;
+        }
+    }
 
     Order *current = head;
-    Order *orderToFind = nullptr;
     bool found = false;
     while (current != nullptr)
     {
         if (current->orderNumber == orderNum)
         {
             found = true;
-            orderToFind = current;
-            break;
+
+            auto now = chrono::system_clock::now();
+            time_t nowTime = chrono::system_clock::to_time_t(now);
+
+            cout << "o) Customer Name: " << current->customerName << endl;
+            cout << "   Customer Drink Type: " << current->drinkType << endl;
+            cout << "   Customer Drink Customization" << ((current->customization.size() > 1) ? "s:\n" : ": ");
+            if (current->customization[0] == "None")
+                cout << "None\n";
+            else
+            {
+                if (current->customization.size() > 1)
+                {
+                    int i = 1;
+                    for (string customizationVariable : current->customization)
+                    {
+                        cout << "      " << i << ") " << customizationVariable << endl;
+                        i++;
+                    }
+                }
+                else
+                    cout << current->customization[0] << endl;
+            }
+
+            if (current->orderServingTime <= nowTime)
+                cout << "   Customer your drink is ready to be served. Kindly ask the management to serve your order.\n";
+            else
+            {
+                auto estWaitingTime = chrono::system_clock::from_time_t(current->orderServingTime) - now;
+                auto minutes = chrono::duration_cast<chrono::minutes>(estWaitingTime).count();
+                auto seconds = chrono::duration_cast<chrono::seconds>(estWaitingTime).count() % 60;
+                cout << "   Customer's Drink Serving Estimated Waiting Time: " << minutes << " minute(s) and " << seconds << " second(s).\n\n";
+            }
+
+            break; // break the loop
         }
         current = current->next;
     }
 
     if (!found)
     {
-        cout << "No order of this order number: " << orderNum << ", found.\n";
+        cout << "No order of this order number: '" << orderNum << "', found.\n";
         return;
     }
+}
 
-    auto now = chrono::system_clock::now();
-    time_t nowTime = chrono::system_clock::to_time_t(now);
+void addNewDrink()
+{
+    string drinkName = "", drinkDescription = "";
+    drinkName = drinkAndCustomizationNameValidation(true);
 
-    cout << "o) Customer Name: " << orderToFind->customerName << endl;
-    cout << "   Customer Drink Type: " << orderToFind->drinkType << endl;
-    cout << "   Customer Drink Customization: " << orderToFind->customization << endl;
-    if (orderToFind->orderServingTime <= nowTime)
-        cout << "   Customer your drink is ready to be served.";
-    else
+    cout << "Describe the drink by giving some description. Kindly enter: ";
+    drinkDescription = takeStringInput("Drink's description");
+
+    int choice = 0;
+    cout << "Is it a\n1) Coffee-Based Drink\n2) Non-Coffee Beverage\n3) Specialty and Seasonal Drink\nChoose one(enter choice 1-3): ";
+    choice = takeIntegerInput(1, 3);
+
+    if (choice == 1)
+        writeNewDrinkInFile("Non-Coffee Beverages:", drinkName, drinkDescription);
+    else if (choice == 2)
+        writeNewDrinkInFile("Specialty and Seasonal Drinks:", drinkName, drinkDescription);
+    else // choice == 3
+        writeNewDrinkInFile("Customizations:", drinkName, drinkDescription);
+
+    initializeMenu();
+}
+
+void addNewCustomization()
+{
+    string customizationName = "", customizationDescription = "";
+    customizationName = drinkAndCustomizationNameValidation(false);
+
+    cout << "Describe the customization by giving some description: ";
+    customizationDescription = takeStringInput("Customization's description");
+
+    ofstream outFile("menu.txt", ios::out | ios::app);
+    outFile << endl;
+    outFile << "o) " << customizationName << " - " << customizationDescription;
+    outFile.close();
+
+    customizations.push_back(customizationName);
+}
+
+void removeDrink()
+{
+    string drinkName = "";
+    cout << "Please insert the name of the drink to remove from the menu: ";
+    drinkName = takeStringInput("Drink's name");
+
+    bool found = false;
+    string tempDrinkName = convertStringToLowerCase(drinkName);
+    for (auto it = drinkTypes.begin(); it != drinkTypes.end(); ++it)
     {
-        auto estWaitingTime = chrono::system_clock::from_time_t(orderToFind->orderServingTime) - now;
-        auto minutes = chrono::duration_cast<chrono::minutes>(estWaitingTime).count();
-        auto seconds = chrono::duration_cast<chrono::seconds>(estWaitingTime).count() % 60;
-        cout << "   Customer's Drink Serving Estimated Waiting Time: " << minutes << " minute(s) and " << seconds << " second(s).\n\n";
+        if (tempDrinkName == convertStringToLowerCase(*it))
+        {
+            found = true;
+            drinkTypes.erase(it);
+
+            // removing from the file
+            ifstream inFile("menu.txt");
+            string data = "";
+            string line = "";
+            while (getline(inFile, line))
+            {
+                if (convertStringToLowerCase(line).find(tempDrinkName) != string::npos)
+                    break;
+                data += line + "\n";
+            }
+            while (getline(inFile, line))
+            {
+                data += line;
+                if (inFile.peek() != EOF)
+                    data += "\n";
+            }
+            inFile.close();
+
+            ofstream outFile("menu.txt");
+            outFile << data;
+            outFile.close();
+
+            cout << drinkName << " removed from the menu sucessfully.\n";
+            break;
+        }
     }
+
+    if (!found)
+        cout << "No drink with this name \"" << drinkName << "\" not found in the menu!\n";
+}
+
+void removeCustomization()
+{
+    string customizationName = "";
+    cout << "Please insert the name of the customization to remove from the menu: ";
+    customizationName = takeStringInput("Customization's name");
+
+    bool found = false;
+    string tempCustomizatioName = convertStringToLowerCase(customizationName);
+    for (auto it = customizations.begin(); it != customizations.end(); ++it)
+    {
+        if (tempCustomizatioName == convertStringToLowerCase(*it))
+        {
+            found = true;
+            customizations.erase(it);
+
+            // removing from the file
+            ifstream inFile("menu.txt");
+            string data = "";
+            string line = "";
+            while (getline(inFile, line))
+            {
+                if (line.find(tempCustomizatioName) != string::npos)
+                    break;
+                data += line + "\n";
+            }
+            while (getline(inFile, line))
+                data += line + "\n";
+            inFile.close();
+
+            data = data.substr(0, data.length() - 1);
+
+            ofstream outFile("menu.txt");
+            outFile << data;
+            outFile.close();
+
+            cout << customizationName << " removed from the menu sucessfully.\n";
+            break;
+        }
+    }
+    if (!found)
+        cout << "No customization with this name \"" << customizationName << "\" not found in the menu!\n";
+}
+
+void viewServedOrderHistory()
+{
+    ifstream inFile("servedOrdersDetails.txt");
+    string data = "";
+    string line = "";
+    while (getline(inFile, line))
+        data += line;
+
+    if (data.empty())
+        cout << "No orders served yet.\n";
+    else
+        cout << data << endl;
+    inFile.close();
 }
 
 int main()
 {
+    initializeMenu();
+
     int choice;
     cout << "\t\t\t\tWelcome to the BenBuzz's Digital Ordering System\n";
     do
     {
         cout << "Hey Management! What operation would you like to perform:\n";
-        cout << "1. Place Order\n2. Serve Order\n3. Display Queue Status\n4. Display Order Details\n5. Exit\n";
-
+        cout << "1. Place Order\n2. Serve Order\n3. Display Queue Status\n4. Display Order Details\n5. Add new drink in the menu\n6. Add new customization in the menu\n7. Remove a drink from the menu\n 8. Remove a customization from the mneu\n9. View history of all the served orders\n10. Exit\n";
         cout << "Enter your choice: ";
-        cin >> choice;
-        cin.ignore();
+        choice = takeIntegerInput(1, 9);
 
         switch (choice)
         {
@@ -437,15 +729,27 @@ int main()
             displayOrderDetails();
             break;
         case 5:
+            addNewDrink();
+            break;
+        case 6:
+            addNewCustomization();
+            break;
+        case 7:
+            removeDrink();
+            break;
+        case 8:
+            removeCustomization();
+            break;
+        case 9:
+            viewServedOrderHistory();
+            break;
+        case 10:
             cout << "Exiting program..." << endl;
             break;
-        default:
-            cout << "Invalid choice! Please enter a number between 1 and 5." << endl;
         }
-        cout << endl;
-    } while (choice != 5);
+    } while (choice != 10);
 
-    exit(0); // 5 is pressed
+    exit(0); // 10 is pressed
 
     return 0;
 }
